@@ -1,7 +1,6 @@
 using System;
 using System.Collections;
 using UnityEngine;
-using UnityEngine.Serialization;
 
 namespace Test1.Combat.Core
 {
@@ -10,29 +9,7 @@ namespace Test1.Combat.Core
     public sealed class MeleeAttack : MonoBehaviour
     {
         [SerializeField]
-        [Min(0f)]
-        private float damage = 20f;
-
-        [SerializeField]
-        [Min(0.1f)]
-        private float range = 1.6f;
-
-        [SerializeField]
-        [Min(0.05f)]
-        private float cooldown = 1f;
-
-        [SerializeField]
-        [FormerlySerializedAs("windup")]
-        [Min(0f)]
-        private float hitDelay = 0.3f;
-
-        [SerializeField]
-        [Min(0f)]
-        private float recovery = 0.35f;
-
-        [SerializeField]
-        [Min(0f)]
-        private float hitTolerance = 0.3f;
+        private MeleeAttackSettings settings;
 
         private Combatant owner;
         private Coroutine attackRoutine;
@@ -40,7 +17,7 @@ namespace Test1.Combat.Core
 
         public bool IsAttacking { get; private set; }
 
-        public float Range => range;
+        public float Range => settings.Range;
 
         public Combatant CurrentTarget { get; private set; }
 
@@ -53,6 +30,11 @@ namespace Test1.Combat.Core
         private void Awake()
         {
             owner = GetComponent<Combatant>();
+            if (settings == null)
+            {
+                throw new MissingReferenceException(
+                    $"{name} requires melee attack settings.");
+            }
         }
 
         private void OnEnable()
@@ -66,18 +48,9 @@ namespace Test1.Combat.Core
             CancelAttack();
         }
 
-        public void Configure(
-            float attackDamage,
-            float attackRange,
-            float attackCooldown,
-            float attackHitDelay,
-            float attackRecovery)
+        public void Configure(MeleeAttackSettings value)
         {
-            damage = Mathf.Max(0f, attackDamage);
-            range = Mathf.Max(0.1f, attackRange);
-            cooldown = Mathf.Max(0.05f, attackCooldown);
-            hitDelay = Mathf.Max(0f, attackHitDelay);
-            recovery = Mathf.Max(0f, attackRecovery);
+            settings = value;
         }
 
         public bool IsTargetInRange(
@@ -91,7 +64,7 @@ namespace Test1.Combat.Core
 
             Vector3 offset = target.Position - transform.position;
             offset.y = 0f;
-            float allowedRange = range + Mathf.Max(0f, extraRange);
+            float allowedRange = settings.Range + Mathf.Max(0f, extraRange);
             return offset.sqrMagnitude <= allowedRange * allowedRange;
         }
 
@@ -112,7 +85,9 @@ namespace Test1.Combat.Core
             }
 
             nextAttackTime = Time.time +
-                             Mathf.Max(cooldown, hitDelay + recovery);
+                             Mathf.Max(
+                                 settings.Cooldown,
+                                 settings.HitDelay + settings.Recovery);
             attackRoutine = StartCoroutine(AttackSequence(target));
             return true;
         }
@@ -123,21 +98,21 @@ namespace Test1.Combat.Core
             CurrentTarget = target;
             AttackStarted?.Invoke(this);
 
-            if (hitDelay > 0f)
+            if (settings.HitDelay > 0f)
             {
-                yield return new WaitForSeconds(hitDelay);
+                yield return new WaitForSeconds(settings.HitDelay);
             }
 
             if (owner.IsAlive &&
-                IsTargetInRange(target, hitTolerance))
+                IsTargetInRange(target, settings.HitTolerance))
             {
-                target.Health.TakeDamage(damage, owner);
+                target.Health.TakeDamage(settings.Damage, owner);
                 HitLanded?.Invoke(this, target);
             }
 
-            if (recovery > 0f)
+            if (settings.Recovery > 0f)
             {
-                yield return new WaitForSeconds(recovery);
+                yield return new WaitForSeconds(settings.Recovery);
             }
 
             FinishAttack();
@@ -170,14 +145,5 @@ namespace Test1.Combat.Core
             AttackFinished?.Invoke(this);
         }
 
-        private void OnValidate()
-        {
-            damage = Mathf.Max(0f, damage);
-            range = Mathf.Max(0.1f, range);
-            cooldown = Mathf.Max(0.05f, cooldown);
-            hitDelay = Mathf.Max(0f, hitDelay);
-            recovery = Mathf.Max(0f, recovery);
-            hitTolerance = Mathf.Max(0f, hitTolerance);
-        }
     }
 }

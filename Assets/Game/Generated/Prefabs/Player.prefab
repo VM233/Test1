@@ -188,12 +188,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: dfa4902ca698ef844a66070f90a87024, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Test1.Combat.Core.MeleeAttack
-  damage: 28
-  range: 2.1
-  cooldown: 0.85
-  hitDelay: 0.3
-  recovery: 0.38
-  hitTolerance: 0.3
+  settings: {fileID: 11400000, guid: 3cc4a558613b427384a3f44ddf6f4b16, type: 2}
 --- !u!114 &4355007638316474700
 MonoBehaviour:
   m_ObjectHideFlags: 0

@@ -25,13 +25,18 @@ namespace Test1.Combat.Editor
     [InitializeOnLoad]
     public static class CombatDemoBuilder
     {
-        private const int SetupVersion = 10;
+        private const int SetupVersion = 13;
         private const string SetupMarkerPath = "Library/Test1CombatDemoSetup.version";
         private const string ScenePath = "Assets/Game/Scenes/CombatDemo.unity";
         private const string GeneratedRoot = "Assets/Game/Generated";
+        private const string SettingsRoot = "Assets/Game/Settings";
         private const string MaterialRoot = GeneratedRoot + "/Materials";
         private const string AnimatorRoot = GeneratedRoot + "/Animators";
         private const string PrefabRoot = GeneratedRoot + "/Prefabs";
+        private const string PlayerAttackSettingsPath =
+            SettingsRoot + "/PlayerMeleeAttack.asset";
+        private const string BoarAttackSettingsPath =
+            SettingsRoot + "/BoarMeleeAttack.asset";
         private const string InputActionsPath = "Assets/InputSystem_Actions.inputactions";
         private const string PlayerAttackMaskPath = AnimatorRoot + "/PlayerAttack.mask";
         private const string BoarAttackMaskPath = AnimatorRoot + "/BoarAttack.mask";
@@ -173,6 +178,12 @@ namespace Test1.Combat.Editor
                 BoarAttackPath,
                 BoarDeathPath,
                 boarAttackMask);
+            MeleeAttackSettings playerAttackSettings =
+                LoadRequiredAsset<MeleeAttackSettings>(
+                    PlayerAttackSettingsPath);
+            MeleeAttackSettings boarAttackSettings =
+                LoadRequiredAsset<MeleeAttackSettings>(
+                    BoarAttackSettingsPath);
 
             GameObject playerPrefab = CreatePlayerPrefab(
                 playerController,
@@ -180,12 +191,14 @@ namespace Test1.Combat.Editor
                 playerWeapon,
                 playerRingMaterial,
                 playerRingFadeMaterial,
-                inputActions);
+                inputActions,
+                playerAttackSettings);
             GameObject boarPrefab = CreateBoarPrefab(
                 boarController,
                 boarMaterial,
                 monsterRingMaterial,
-                monsterRingFadeMaterial);
+                monsterRingFadeMaterial,
+                boarAttackSettings);
             CreateDemoScene(
                 playerPrefab,
                 boarPrefab,
@@ -207,6 +220,7 @@ namespace Test1.Combat.Editor
             EnsureFolder(GeneratedRoot, "Materials");
             EnsureFolder(GeneratedRoot, "Animators");
             EnsureFolder(GeneratedRoot, "Prefabs");
+            EnsureFolder("Assets/Game", "Settings");
             EnsureFolder("Assets/Game", "Scenes");
         }
 
@@ -217,6 +231,19 @@ namespace Test1.Combat.Editor
             {
                 AssetDatabase.CreateFolder(parent, child);
             }
+        }
+
+        private static T LoadRequiredAsset<T>(string assetPath)
+            where T : Object
+        {
+            T asset = AssetDatabase.LoadAssetAtPath<T>(assetPath);
+            if (asset == null)
+            {
+                throw new InvalidOperationException(
+                    $"Required asset not found: {assetPath}");
+            }
+
+            return asset;
         }
 
         private static void ConfigureSourceImports()
@@ -641,7 +668,8 @@ namespace Test1.Combat.Editor
             Material weaponMaterial,
             Material ringMaterial,
             Material ringFadeMaterial,
-            InputActionAsset inputActions)
+            InputActionAsset inputActions,
+            MeleeAttackSettings attackSettings)
         {
             const string prefabPath = PrefabRoot + "/Player.prefab";
             GameObject root = CreateActorRoot(
@@ -649,11 +677,7 @@ namespace Test1.Combat.Editor
                 ActorTeam.Player,
                 130f,
                 4.6f,
-                28f,
-                2.1f,
-                0.85f,
-                0.3f,
-                0.38f);
+                attackSettings);
             root.tag = "Player";
 
             Rigidbody body = root.GetComponent<Rigidbody>();
@@ -698,7 +722,8 @@ namespace Test1.Combat.Editor
             RuntimeAnimatorController animatorController,
             Material material,
             Material ringMaterial,
-            Material ringFadeMaterial)
+            Material ringFadeMaterial,
+            MeleeAttackSettings attackSettings)
         {
             const string prefabPath = PrefabRoot + "/Boar.prefab";
             GameObject root = CreateActorRoot(
@@ -706,11 +731,7 @@ namespace Test1.Combat.Editor
                 ActorTeam.Monster,
                 72f,
                 3.25f,
-                12f,
-                1.55f,
-                1.25f,
-                0.6f,
-                0.55f);
+                attackSettings);
 
             Rigidbody body = root.GetComponent<Rigidbody>();
             body.mass = 1.35f;
@@ -759,11 +780,7 @@ namespace Test1.Combat.Editor
             ActorTeam team,
             float maxHealth,
             float moveSpeed,
-            float damage,
-            float attackRange,
-            float cooldown,
-            float hitDelay,
-            float recovery)
+            MeleeAttackSettings attackSettings)
         {
             GameObject root = new GameObject(actorName);
             Rigidbody body = root.AddComponent<Rigidbody>();
@@ -781,19 +798,14 @@ namespace Test1.Combat.Editor
             ActorMotor motor = root.AddComponent<ActorMotor>();
             motor.Configure(moveSpeed, 720f);
             MeleeAttack attack = root.AddComponent<MeleeAttack>();
-            attack.Configure(
-                damage,
-                attackRange,
-                cooldown,
-                hitDelay,
-                recovery);
+            attack.Configure(attackSettings);
             TargetSensor sensor = root.AddComponent<TargetSensor>();
             sensor.Configure(
                 team == ActorTeam.Player
                     ? ActorTeam.Monster
                     : ActorTeam.Player,
                 team == ActorTeam.Player
-                    ? attackRange
+                    ? attackSettings.Range
                     : 7f);
 
             GameObject aimPoint = new GameObject("AimPoint");
